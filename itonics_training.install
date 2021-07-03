@@ -2,7 +2,7 @@
 
 /** Implements hooks schema */
 
-function tr1_ajax_crud_schema() {
+function itonics_training_schema() {
     $schema = array();
 
     $schema['products'] = array(

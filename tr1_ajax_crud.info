@@ -1,4 +1,0 @@
-name = "Training Day1"
-description = "Custom Module that demonstrates products CRUD using ajax framework."
-core = 7.x
-package = "Training Day1"

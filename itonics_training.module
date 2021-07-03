@@ -1,0 +1,251 @@
+<?php
+// Include Required Files
+module_load_include('php', 'itonics_training', 'autoload');
+
+/**
+ * Implements hook_permission.
+ */
+function itonics_training_permission() {
+    return array(
+        INDEX_PERM => array(
+            'title' => t('Administer itonics_training module'),
+            'description' => t('Access the listing page'),
+        ),
+        CREATE_PERM => array(
+            'title' => t('Administer itonics_training create'),
+            'description' => t('Access the create form page'),
+        ),
+        SHOW_PERM => array(
+            'title' => t('Administer itonics_training view'),
+            'description' => t('Access the view product details page'),
+        ),
+        EDIT_PERM => array(
+            'title' => t('Administer itonics_training edit'),
+            'description' => t('Access the edit form page'),
+        ),
+        DELETE_PERM => array(
+            'title' => t('Administer itonics_training delete'),
+            'description' => t('Access the delete confirmation page'),
+        ),
+    );
+}
+
+/**
+ * Implements Hook Menu
+ *  @return array
+ */
+function itonics_training_menu() {
+    $permissions = array();
+
+    $permissions[INDEX] = array(
+        'title' => t('Products List'),
+        'page callback' => 'itonics_training_list',
+        'access arguments' => array(INDEX_PERM),
+        'type' => MENU_NORMAL_ITEM,
+    );
+    $permissions[CREATE] = array(
+        'title' => t('Create Product'),
+        'page callback' => 'itonics_training_create_page',
+        'access arguments' => array(CREATE_PERM),
+        'type' => MENU_LOCAL_TASK,
+    );
+    $permissions[SHOW] = array(
+        'title' => t('Product Details'),
+        'page callback' => 'itonics_training_view_page',
+        'page arguments' => array(1),
+        'access arguments' => array(SHOW_PERM),
+    );
+    $permissions[EDIT] = array(
+        'title' => t('Edit Product'),
+        'page callback' => 'itonics_training_edit_page',
+        'page arguments' => array(1),
+        'access arguments' => array(EDIT_PERM),
+    );
+    $permissions[DELETE] = array(
+        'title' => t('Delete Product'),
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('itonics_training_delete_confirm', 1),
+        'access arguments' => array(DELETE_PERM),
+    );
+
+    return $permissions;
+}
+
+function itonics_training_load($product_id)
+{
+    $instance = ItonicsTraining::findById($product_id, array('id', 'title', 'type', 'owner_email', 'summary', 'description', 'image'));
+    
+    return $instance;
+}
+
+/** Fetch Category Ids by Product Id
+ * @params product id
+ * return @array category id
+ */
+function fetch_categoryId_by_product($id)
+{
+    // $results = db_select('category_product', 'cp')->fields('cp', array('category_id'))->condition('product_id', $id)->execute()->fetchAllAssoc('category_id');
+    
+    $results = ItonicsTraining::findCategoryIds($id, array('category_id'));
+    $categories = array();
+    foreach ($results as $current_category) {
+        array_push($categories, $current_category->category_id);
+    }
+    
+    return $categories;
+}
+
+function itonics_training_list()
+{
+
+    $table_header = array(
+        array('data' => t('S.No.'), 'field' => 'id'),
+        array('data' => t('Title'), 'field' => 'title', 'sort' => 'desc'),
+        array('data' => t('Type'), 'field' => 'type'),
+        array('data' => t('Owner Email'), 'field' => 'owner_email'),
+        array('data' => t('Summary'), 'field' => 'summary'),
+        array('data' => t('description'), 'field' => 'description'),
+        array('data' => t('Image'), 'field' => 'image'),
+        array('data' => t('Action')),
+    );
+
+    $result = ItonicsTraining::findAll($table_header, array('id', 'title', 'type', 'owner_email',  'summary', 'description', 'image'), 10);
+
+    $rows = array();
+    $i = 0;
+    foreach ($result as $res) {
+        $view = user_access('access itonics_training view') ? "<a href='" . INDEX . "/" . $res->id . "'>View</a>" : "";
+        $edit = user_access('access itonics_training edit') ? " / <a href='" . INDEX . "/" . $res->id . "/edit'>Edit</a>" : "";
+        $delete = user_access('access itonics_training edit') ? " / <a href='" . INDEX . "/" . $res->id . "/delete'>Delete</a>" : "";
+        
+        $rows[] = array(
+            ++$i,
+            $res->title,
+            $res->type,
+            $res->owner_email,
+            $res->summary,
+            $res->description,
+            $res->image ? '<img src="' . file_create_url($res->image) . '" width="50" height="50" />' : null,
+            $view.$edit.$delete,
+        );
+    }
+
+    $output = user_access('access itonics_training create') ? '<a href="' . CREATE . '" style="float:right;">Add Product</a><br/>' : "";
+
+    if (!empty($rows)) {
+        $output .= theme('table', array('header' => $table_header, 'rows' => $rows, 'attributes' => array('title' => 'sort-table')));
+        $output .= theme('pager');
+    } else {
+        $output .= t("No products.");
+    }
+    return $output;
+}
+
+function itonics_training_create_page()
+{
+    return drupal_get_form('itonics_training_form', null);
+}
+
+function itonics_training_edit_page($product)
+{
+    $build = array();
+    $categories = fetch_categoryId_by_product($product->id);
+    $form = drupal_get_form('itonics_training_form', $product, $categories);
+    // $image = '<div><img src="' . file_create_url($product->image) . '" width="200" height="200" /></div>';
+    
+    // $build['content'] = array(
+	// 	array(
+	// 		'#markup' => $image,
+	// 	),
+	// 	$form,
+	// );
+    return $form; 
+}
+
+function itonics_training_view_page($product)
+{
+    $current_categories_results = fetch_categoryId_by_product($product->id);
+    $query_categories = db_select('categories', 'c')->fields('c', array('title'))
+        ->condition('id', $current_categories_results, 'IN')->execute()->fetchAllAssoc('title');
+    $categories = implode(', ', array_keys($query_categories));
+
+    $output = $product->image ? '<img src="' . file_create_url($product->image) . '" width="200" height="200" />' : null;
+
+    $table_header = array();
+    $rows[] = array(
+        "Title",
+        $product->title,
+    );
+    $rows[] = array(
+        "Type",
+        $product->type,
+    );
+    $rows[] = array(
+        "Owner Email",
+        $product->owner_email,
+    );
+    $rows[] = array(
+        "Categories",
+        $categories,
+    );
+    $rows[] = array(
+        "Summary",
+        $product->summary,
+    );
+    $rows[] = array(
+        "Description",
+        $product->description,
+    );
+
+    if (!empty($rows)) {
+        $output .= theme('table', array('header' => $table_header, 'rows' => $rows, 'attributes' => array('title' => 'sort-table')));
+    } else {
+        $output = t("Product Not found.");
+    }
+    return $output;
+}
+
+function itonics_training_delete_confirm($form, &$form_state, $product)
+{
+    $form['_product'] = array(
+        '#type' => 'value',
+        '#value' => $product,
+    );
+    return confirm_form($form, 
+                        t(Delete_Confirm),
+                        isset($_GET['destination']) ? $_GET['destination'] : "product", 
+                        null, 
+                        t('Delete'), t('Cancel')
+                      );
+}
+
+function itonics_training_delete_confirm_submit($form, &$form_state)
+{
+    $form_values = $form_state['values'];
+    if ($form_state['values']['confirm']) {
+        $product_instance = $form_state['values']['_product'];
+        $product_id = $product_instance->id;
+
+        if ($product_instance->image) {
+            if (file_exists($product_instance->image)) {
+                drupal_unlink($product_instance->image);
+            }
+        }
+
+        $transaction = db_transaction();
+        try {
+            $product = new ItonicsTraining($product_id);
+            $product->dettach();
+            $product->delete();
+
+            drupal_set_message(t(Product_Deleted_Msg));
+        } catch (Exception $e) {
+            $transaction->rollback();
+            watchdog_exception('my_type', $e);
+            drupal_set_message(t(Error_Msg));
+        }
+        
+    }
+
+    $form_state['redirect'] = INDEX;
+}
