@@ -2,7 +2,7 @@
 
 /** Implements hooks schema */
 
-function prabesh_itonics_products_schema() {
+function tr1_ajax_crud_schema() {
     $schema = array();
 
     $schema['products'] = array(
@@ -32,12 +32,6 @@ function prabesh_itonics_products_schema() {
                 'type' => 'varchar',
                 'length' => 191,
                 'not null' => TRUE,
-            ),
-            'expiry_date' => array(
-                'description' => 'The expiry date of product.',
-                'type' => 'datetime',
-                'mysql_type' => 'datetime',
-                'not null' => FALSE,
             ),
             'summary' => array(
                 'description' => 'The plain text for summary of product.',
