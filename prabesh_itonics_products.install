@@ -1,0 +1,122 @@
+<?php
+
+/** Implements hooks schema */
+
+function prabesh_itonics_products_schema() {
+    $schema = array();
+
+    $schema['products'] = array(
+        'description' => 'The base table for storing products.',
+        'fields' => array(
+            'id' => array(
+                'description' => 'The primary identifier for products.',
+                'type' => 'serial',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+            ),
+            'title' => array(
+                'description' => 'The title for the product.',
+                'type' => 'varchar',
+                'length' => 191,
+                'not null' => TRUE,
+            ),
+            'type' => array(
+                'description' => 'The status of the product \'Active\' \'Inactive\' .',
+                'type' => 'varchar',
+                'length' => 10,
+                'not null' => TRUE,
+                'default' => 'Active'
+            ),
+            'owner_email' => array(
+                'description' => 'The email of product owner .',
+                'type' => 'varchar',
+                'length' => 191,
+                'not null' => TRUE,
+            ),
+            'expiry_date' => array(
+                'description' => 'The expiry date of product.',
+                'type' => 'datetime',
+                'mysql_type' => 'datetime',
+                'not null' => FALSE,
+            ),
+            'summary' => array(
+                'description' => 'The plain text for summary of product.',
+                'type' => 'text',
+                'size' => 'small',
+                'not null' => FALSE,
+                'default' => NULL,
+            ),
+            'description' => array(
+                'description' => 'The WSWGI text for description of product.',
+                'type' => 'text',
+                'size' => 'big',
+                'not null' => FALSE,
+                'default' => NULL,
+            ),
+            'image' => array(
+                'description' => 'The image for the product in BLOB.',
+                'type' => 'text',
+                'size' => 'medium',
+                'not null' => FALSE,
+                'default' => NULL,
+            ),
+        ),
+        'primary key' => array('id'),
+    );
+
+    $schema['categories'] = array(
+      'description' => 'The base table for storing products categories.',
+      'fields' => array(
+        'id' => array(
+            'description' => 'The primary identifier for categories.',
+            'type' => 'serial',
+            'unsigned' => TRUE,
+            'not null' => TRUE,
+        ),
+        'title' => array(
+            'description' => 'The title for the category.',
+            'type' => 'varchar',
+            'length' => 191,
+            'not null' => TRUE,
+        ),
+      ),
+      'primary key' => array('id'),
+    );
+
+    $schema['category_product'] = array(
+        'description' => 'The pivot table for products with their categories.',
+        'fields' => array(
+            'category_id' => array(
+                'description' => 'The foreign identifier for categories.',
+                'type' => 'int',
+                'length' => 10,
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+            ),
+            'product_id' => array(
+                'description' => 'The foreign identifier for products.',
+                'type' => 'int',
+                'length' => 10,
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+            ),
+        ),
+        'foreign keys' => array(
+            'category_id' => array(
+                'table' => 'categories',
+                'columns' => array(
+                  'category_id' => 'id',
+                ),
+            ),
+            'product_id' => array(
+                'table' => 'products',
+                'columns' => array(
+                  'product_id' => 'id',
+                ),
+            ),
+        ),
+    );
+
+    return $schema;
+}
+

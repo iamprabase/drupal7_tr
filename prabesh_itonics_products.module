@@ -1,0 +1,564 @@
+<?php
+
+define("Index", 'prabesh_itonics_products');
+define("Create", 'prabesh_itonics_products/create');
+define("Show", 'prabesh_itonics_products/%product');
+define("Edit", 'prabesh_itonics_products/%product/edit');
+define("Delete", 'prabesh_itonics_products/%product/delete');
+
+define("Error_Msg", 'Some Error Occured. Please try again.');
+define("Product_Created_Msg", 'Product Created Successfully.');
+define("Product_Deleted_Msg", 'Product deleted successfully.');
+define("Product_Updated_Msg", 'Product Updated Successfully.');
+define("Delete_Confirm", 'Are you sure you want to delete this product?');
+
+class PrabeshItonicsProduct{
+    private $id;
+    private $title;
+    private $type;
+    private $email;
+    private $expiry_date;
+    private $summary;
+    private $description;
+    private $image;
+    
+    private static $instance = null;
+
+    public function __construct(
+                                $id = null,
+                                $title = null, 
+                                $type = null, 
+                                $email= null, 
+                                $expiry_date = null, 
+                                $summary = null, 
+                                $description = null, 
+                                $image = null
+                            )
+    {
+        $this->_set("id", $id);
+        $this->_set("title", $title);
+        $this->_set("type", $type);
+        $this->_set("email", $email);
+        $this->_set("expiry_date", $expiry_date);
+        $this->_set("summary", $summary);
+        $this->_set("description", $description);
+        $this->_set("image", $image);
+    }
+
+    public function _set($targetVariable, $value){
+        $this->$targetVariable = $value;
+    }
+
+    public function _get($targetVariable){
+        // if($targetVariable == 'expiry_date'){ 
+        //     $regex = "/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$"."/";
+        //     if($this->$targetVariable && preg_match($regex, $this->$targetVariable)){
+        //         $this->_set("expiry_date", $this->$targetVariable);
+        //     }else{
+        //         $this->_set("expiry_date", NULL);
+        //     }
+        // }
+        
+        return $this->$targetVariable;
+    }
+
+    public static function findAll($table_header, $cols, $limit){
+        $query = db_select('products', 'p')->fields('p', $cols);
+        $table_sort = $query->extend('TableSort')->orderByHeader($table_header);
+        $pager = $table_sort->extend('PagerDefault')->limit($limit);
+        $products = $pager->execute();
+
+        return $products;
+    }
+
+    public static function findById($id, $cols){
+        $product = db_select('products', 'p')
+                    ->fields('p', $cols)
+                    ->condition('id', $id)
+                    ->execute()->fetchObject();
+        
+        return $product;  
+    }
+
+    public static function findCategoryIds($id, $cols){
+        $category_ids = db_select('category_product', 'cp')
+                        ->fields('cp', $cols)
+                        ->condition('product_id', $id)
+                        ->execute()->fetchAllAssoc('category_id');
+        return  $category_ids;
+    }
+
+    public function attach($category_ids, $id){
+        $category_product_insert_query = db_insert('category_product')
+                                        ->fields(array('category_id', 'product_id'));
+        foreach ($category_ids as $category) {
+            $category_product_insert_query->values(
+                array('category_id' => $category, 'product_id' => $id)
+            );
+        }
+        $category_product_insert_query->execute();
+        
+        return true;
+    }
+    
+    public function dettach(){
+        db_delete('category_product')
+        ->condition('product_id', $this->_get("id"))
+        ->execute();
+        
+        return true;
+    }
+
+    public function updateOrCreate(){
+        
+        $attributes = array(
+            'title' => $this->_get("title"),
+            'type' => $this->_get("type"),
+            'owner_email' => $this->_get("email"),
+            'expiry_date' => $this->_get("expiry_date"),
+            'summary' => htmlspecialchars($this->_get("summary")),
+            'description' => htmlspecialchars($this->_get("description")),
+            'image' => $this->_get("image")
+        );
+        if(!$this->_get("id")) $query = db_insert('products');
+        else $query = db_update('products')->condition('id', $this->_get("id"));
+        
+        $product = $query
+                    ->fields($attributes)
+                    ->execute();
+        if(!$this->_get("id")) $this->_set("id", $product);
+        
+        return $this->_get("id");
+    } 
+    
+    public function delete(){
+        db_delete('products')
+        ->condition('id',  $this->_get("id"))->execute();
+        
+        return true;
+    }
+}
+
+// insert_categories();
+// Catgeory Table seeder
+function insert_categories()
+{
+    $categories = array(
+        'Category A',
+        'Category B',
+        'Category C',
+        'Category D',
+        'Category E',
+        'Category F',
+    );
+
+    foreach ($categories as $category) {
+        $inserted = db_insert('categories')->fields(array("title" => $category))->execute();
+    }
+}
+
+function prabesh_itonics_products_menu()
+{
+    $items = array();
+
+    $items[Index] = array(
+        'title' => t('Products List'),
+        'page callback' => 'prabesh_itonics_product_list',
+        'access arguments' => array('access prabesh_itonics_products index'),
+        'type' => MENU_NORMAL_ITEM,
+    );
+    $items[Create] = array(
+        'title' => t('Create Product'),
+        'page callback' => 'prabesh_itonics_products_create_page',
+        'access arguments' => array('access prabesh_itonics_products create'),
+        'type' => MENU_LOCAL_TASK,
+    );
+    $items[Show] = array(
+        'title' => t('Product Details'),
+        'page callback' => 'product_view_page',
+        'page arguments' => array(1),
+        'access arguments' => array('access prabesh_itonics_products view'),
+    );
+    $items[Edit] = array(
+        'title' => t('Edit Product'),
+        'page callback' => 'product_edit_page',
+        'page arguments' => array(1),
+        'access arguments' => array('access prabesh_itonics_products edit'),
+    );
+    $items[Delete] = array(
+        'title' => t('Delete Product'),
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('product_delete_confirm', 1),
+        'access arguments' => array('access prabesh_itonics_products delete'),
+    );
+
+    return $items;
+}
+
+/**
+ * Implements hook_permission.
+ */
+function prabesh_itonics_products_permission() {
+    return array(
+      'access prabesh_itonics_products index' => array(
+        'title' => t('Administer prabesh_itonics_products module'),
+        'description' => t('Access the prabesh_itonics_products Page'),
+       ),
+       'access prabesh_itonics_products create' => array(
+        'title' => t('Administer prabesh_itonics_products create'),
+        'description' => t('Access the prabesh_itonics_products Page'),
+       ),
+       'access prabesh_itonics_products edit' => array(
+        'title' => t('Administer prabesh_itonics_products edit'),
+        'description' => t('Access the prabesh_itonics_products Page'),
+       ),
+       'access prabesh_itonics_products delete' => array(
+        'title' => t('Administer prabesh_itonics_products delete'),
+        'description' => t('Access the prabesh_itonics_products Page'),
+       ),
+       'access prabesh_itonics_products view' => array(
+        'title' => t('Administer prabesh_itonics_products view'),
+        'description' => t('Access the prabesh_itonics_products Page'),
+       ),
+    );
+}
+
+function product_load($product_id)
+{
+    $instance = PrabeshItonicsProduct::findById($product_id, array('id', 'title', 'type', 'owner_email', 'expiry_date', 'summary', 'description', 'image'));
+    
+    return $instance;
+}
+
+/** Fetch Category Ids by Product Id
+ * @params product id
+ * return @array category id
+ */
+function fetch_categoryId_by_product($id)
+{
+    // $results = db_select('category_product', 'cp')->fields('cp', array('category_id'))->condition('product_id', $id)->execute()->fetchAllAssoc('category_id');
+    
+    $results = PrabeshItonicsProduct::findCategoryIds($id, array('category_id'));
+    $categories = array();
+    foreach ($results as $current_category) {
+        array_push($categories, $current_category->category_id);
+    }
+    
+    return $categories;
+}
+
+function prabesh_itonics_product_list()
+{
+
+    $table_header = array(
+        array('data' => t('S.No.'), 'field' => 'id'),
+        array('data' => t('Title'), 'field' => 'title', 'sort' => 'desc'),
+        array('data' => t('Type'), 'field' => 'type'),
+        array('data' => t('Owner Email'), 'field' => 'owner_email'),
+        array('data' => t('Expiry Date'), 'field' => 'expiry_date'),
+        array('data' => t('Summary'), 'field' => 'summary'),
+        array('data' => t('description'), 'field' => 'description'),
+        array('data' => t('Image'), 'field' => 'image'),
+        array('data' => t('Action')),
+    );
+
+    $result = PrabeshItonicsProduct::findAll($table_header, array('id', 'title', 'type', 'owner_email', 'expiry_date', 'summary', 'description', 'image'), 10);
+
+    $rows = array();
+    $i = 0;
+    foreach ($result as $res) {
+        $view = user_access('access prabesh_itonics_products view') ? "<a href='" . Index . "/" . $res->id . "'>View</a>" : "";
+        $edit = user_access('access prabesh_itonics_products edit') ? " / <a href='" . Index . "/" . $res->id . "/edit'>Edit</a>" : "";
+        $delete = user_access('access prabesh_itonics_products edit') ? " / <a href='" . Index . "/" . $res->id . "/delete'>Delete</a>" : "";
+        
+        $rows[] = array(
+            ++$i,
+            $res->title,
+            $res->type,
+            $res->owner_email,
+            $res->expiry_date ? date('j F Y', strtotime($res->expiry_date)) : NULL,
+            $res->summary,
+            $res->description,
+            $res->image ? '<img src="' . file_create_url($res->image) . '" width="50" height="50" />' : null,
+            $view.$edit.$delete,
+        );
+    }
+
+    $output = user_access('access prabesh_itonics_products create') ? '<a href="' . Create . '" style="float:right;">Add Product</a><br/>' : "";
+
+    if (!empty($rows)) {
+        $output .= theme('table', array('header' => $table_header, 'rows' => $rows, 'attributes' => array('title' => 'sort-table')));
+        $output .= theme('pager');
+    } else {
+        $output .= t("No products.");
+    }
+    return $output;
+}
+
+function prabesh_itonics_products_create_page()
+{
+    return drupal_get_form('prabesh_itonics_products_form', null);
+}
+
+function product_edit_page($product)
+{
+    $categories = fetch_categoryId_by_product($product->id);
+    return drupal_get_form('prabesh_itonics_products_form', $product, $categories);
+}
+
+function product_view_page($product)
+{
+    $current_categories_results = fetch_categoryId_by_product($product->id);
+    $query_categories = db_select('categories', 'c')->fields('c', array('title'))
+        ->condition('id', $current_categories_results, 'IN')->execute()->fetchAllAssoc('title');
+    $categories = implode(', ', array_keys($query_categories));
+
+    $output = $product->image ? '<img src="' . file_create_url($product->image) . '" width="200" height="200" />' : null;
+
+    $table_header = array();
+    $rows[] = array(
+        "Title",
+        $product->title,
+    );
+    $rows[] = array(
+        "Type",
+        $product->type,
+    );
+    $rows[] = array(
+        "Owner Email",
+        $product->owner_email,
+    );
+    $rows[] = array(
+        "Categories",
+        $categories,
+    );
+    $rows[] = array(
+        "Expiry Date",
+        $product->expiry_date ? date('j F Y', strtotime($product->expiry_date)) : NULL,
+    );
+    $rows[] = array(
+        "Summary",
+        $product->summary,
+    );
+    $rows[] = array(
+        "Description",
+        htmlspecialchars_decode($product->description),
+    );
+
+    if (!empty($rows)) {
+        $output .= theme('table', array('header' => $table_header, 'rows' => $rows, 'attributes' => array('title' => 'sort-table')));
+    } else {
+        $output = t("Product Not found.");
+    }
+    return $output;
+}
+
+function product_delete_confirm($form, &$form_state, $product)
+{
+    $form['_product'] = array(
+        '#type' => 'value',
+        '#value' => $product,
+    );
+    return confirm_form($form, 
+                        t(Delete_Confirm),
+                        isset($_GET['destination']) ? $_GET['destination'] : "product", 
+                        null, 
+                        t('Delete'), t('Cancel')
+                      );
+}
+
+function product_delete_confirm_submit($form, &$form_state)
+{
+    $form_values = $form_state['values'];
+    if ($form_state['values']['confirm']) {
+        $product_instance = $form_state['values']['_product'];
+        $product_id = $product_instance->id;
+
+        if ($product_instance->image) {
+            if (file_exists($product_instance->image)) {
+                drupal_unlink($product_instance->image);
+            }
+        }
+
+        $transaction = db_transaction();
+        try {
+            $product = new PrabeshItonicsProduct($product_id);
+            $product->dettach();
+            $product->delete();
+
+            drupal_set_message(t(Product_Deleted_Msg));
+        } catch (Exception $e) {
+            $transaction->rollback();
+            watchdog_exception('my_type', $e);
+            drupal_set_message(t(Error_Msg));
+        }
+        
+    }
+
+    $form_state['redirect'] = Index;
+}
+
+function prabesh_itonics_products_form($form, &$form_state, $instance, $current_categories = array())
+{
+    $form['title'] = array(
+        '#title' => t('Product Name'),
+        '#type' => 'textfield',
+        '#required' => true,
+        '#default_value' => $instance ? $instance->title : "",
+    );
+    $fetch_categories = db_select('categories', 'n')
+        ->fields('n')
+        ->execute()->fetchAll();
+    $categories = array();
+    foreach ($fetch_categories as $category) {
+        $categories[$category->id] = t($category->title);
+    }
+    
+    $form['category'] = array(
+        '#type' => 'select',
+        '#title' => t('Categories'),
+        '#options' => $categories,
+        '#multiple' => true,
+        '#required' => true,
+        '#default_value' => $instance ? $current_categories : "",
+    );
+    $type = array('Active' => t('Active'), 'Inactive' => t('Inactive'));
+    $form['type'] = array(
+        '#type' => 'radios',
+        '#title' => t('Type'),
+        '#default_value' => isset($instance) ? $instance->type : 'Active',
+        '#options' => $type,
+    );
+
+    $form['owner_email'] = array(
+        '#title' => t('Email'),
+        '#type' => 'textfield',
+        '#required' => true,
+        '#default_value' => $instance ? $instance->owner_email : "",
+    );
+
+    $form['expiry_date'] = array(
+        '#title' => t('Expiry '),
+        '#type' => 'date_popup',
+        '#date_format' => 'Y-m-d',
+        '#required' => false,
+        '#attributes' => array(
+            'autocomplete' => 'off',
+        ),
+        '#default_value' => $instance && $instance->expiry_date ? date("Y-m-d", strtotime($instance->expiry_date)) : "",
+    );
+
+    $form['summary'] = array(
+        '#title' => t('Summary'),
+        '#type' => 'textarea',
+        '#rows' => 3,
+        '#description' => t('A short product summary'),
+        '#default_value' => $instance ? $instance->summary : "",
+    );
+
+    $form['description'] = array(
+        '#title' => t('Description'),
+        '#description' => t('A short product description'),
+        '#format' => 'filtered_html',
+        '#type' => 'text_format',
+        '#rows' => 5,
+        '#resizable' => false,
+        '#default_value' => $instance ? $instance->description : "",
+    );
+
+    $form['image'] = array(
+        '#type' => 'file',
+        '#title' => t('Choose an image'),
+        '#description' => t('File must be of given types: png gif jpg jpeg'),
+    );
+
+    if ($instance) {
+        $form['id'] = array('#type' => 'hidden', '#value' => $instance->id);
+    }
+
+    // Provide a submit button.
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+    );
+
+    return $form;
+}
+
+function prabesh_itonics_products_form_validate($form, &$form_state)
+{
+
+    if (!filter_var($form_state['values']['owner_email'], FILTER_VALIDATE_EMAIL)) {
+        form_set_error('owner_email', t('Please enter a valid email address.'));
+
+        return false;
+    }
+
+    if (array_key_exists('id', $form_state['values'])) {
+        $product_instance = PrabeshItonicsProduct::findById($form_state['values']['id'], array('id', 'image'));
+        $form_state['values']['image'] = $product_instance->image;
+    }
+
+    if (!empty($_FILES['files']['tmp_name']['image'])) {
+        $validators = array(
+            'file_validate_is_image' => array(),
+            'file_validate_size' => array(0),
+            'file_validate_extensions' => array('png gif jpg jpeg'),
+        );
+
+        $file = file_save_upload('image', $validators, 'public://');
+
+        if (!empty($file)) {
+            $form_state['values']['image'] = $file->uri;
+            if (array_key_exists('id', $form_state['values'])) {
+                // Delete Current Image
+                if ($product_instance->image) {
+                    if (file_exists($product_instance->image)) {
+                        drupal_unlink($product_instance->image);
+                    }
+                }
+            }
+        } else {
+            form_set_error('image', t('Image cannot be uploaded. Please try again.'));
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function prabesh_itonics_products_form_submit($form, &$form_state)
+{
+    $form_elements = $form_state['values'];
+    $product_id = array_key_exists('id', $form_state['values']) ? $form_state['values']['id'] : null;
+    
+    $transaction = db_transaction();
+    try {
+        $product = new PrabeshItonicsProduct(
+                                            $product_id,
+                                            $form_elements['title'], 
+                                            $form_elements['type'], 
+                                            $form_elements['owner_email'], 
+                                            $form_elements['expiry_date'], 
+                                            $form_elements['summary'], 
+                                            $form_elements['description']['value'], 
+                                            $form_elements['image']
+                                        );
+        $inserted_id = $product->updateOrCreate();
+        if ($product_id) {    
+            $product->dettach();
+            $msg = Product_Updated_Msg;
+        } else {
+            $msg = Product_Created_Msg;
+        }
+
+        $product->attach($form_elements['category'], $inserted_id);
+        drupal_set_message(t($msg));
+    } catch (Exception $e) {
+        $transaction->rollback();
+        watchdog_exception('my_type', $e);
+        drupal_set_message(t(Error_Msg));
+    }
+
+    $form_state['redirect'] = Index;
+}

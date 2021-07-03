@@ -1,0 +1,4 @@
+name = "Itonics Products CRUD"
+description = "Custom Module that demonstrates products CRUD."
+core = 7.x
+package = "Itonics"
