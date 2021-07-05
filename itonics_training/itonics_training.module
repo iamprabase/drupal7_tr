@@ -1,0 +1,259 @@
+<?php
+// Include Required Files
+module_load_include('php', 'itonics_training', 'config/autoload');
+
+/**
+ * Implements hook_permission.
+ */
+function itonics_training_permission() {
+    return array(
+        INDEX_PERM => array(
+            'title' => t('Administer itonics_training module'),
+            'description' => t('Access the listing page'),
+        ),
+        CREATE_PERM => array(
+            'title' => t('Administer itonics_training create'),
+            'description' => t('Access the create form page'),
+        ),
+        SHOW_PERM => array(
+            'title' => t('Administer itonics_training view'),
+            'description' => t('Access the view product details page'),
+        ),
+        EDIT_PERM => array(
+            'title' => t('Administer itonics_training edit'),
+            'description' => t('Access the edit form page'),
+        ),
+        DELETE_PERM => array(
+            'title' => t('Administer itonics_training delete'),
+            'description' => t('Access the delete confirmation page'),
+        ),
+    );
+}
+
+/**
+ * Implements Hook Menu
+ *  @return array
+ */ 
+function itonics_training_menu() {
+    $permissions = array();
+
+    $permissions[INDEX] = array(
+        'title' => t('Products List'),
+        'page callback' => 'itonics_training_list',
+        'access arguments' => array(INDEX_PERM),
+        'type' => MENU_NORMAL_ITEM,
+    );
+    $permissions[SHOW] = array(
+        'title' => t('Product Details'),
+        'page callback' => 'itonics_training_view',
+        'page arguments' => array(1),
+        'access arguments' => array(SHOW_PERM),
+    );
+    $permissions[CREATE] = array(
+        'title' => t('Create Product'),
+        'page callback' => 'itonics_training_create_update_view',
+        'page arguments' => array(),
+        'access arguments' => array(CREATE_PERM),
+        'type' => MENU_LOCAL_TASK,
+    );
+    $permissions[EDIT] = array(
+        'title' => t('Edit Product'),
+        'page callback' => 'itonics_training_create_update_view',
+        'page arguments' => array(1),
+        'access arguments' => array(EDIT_PERM),
+        'type' => MENU_LOCAL_TASK,
+    );
+    $permissions[DELETE] = array(
+        'title' => t('Delete Product'),
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('itonics_training_delete_confirm', 1),
+        'access arguments' => array(DELETE_PERM),
+    );
+    
+    return $permissions;
+}
+
+/** 
+ * Implements Hook Entity Info
+ * Registers Product Entity 
+ * */
+function itonics_training_entity_info() {
+    $itonics_training_info = array();
+    $itonics_training_info['itonics_training'] = array(
+        'label' => t('Itonics Training Entity'),
+        'controller class' => 'ItonicsTrainingController',
+        'base table' => 'products',
+        'uri callback' => 'itonics_training_uri',
+        'fieldable' => TRUE,
+        'entity keys' => array(
+            'id' => 'id',
+        ),
+    );
+    
+    return $itonics_training_info;
+}
+
+/**
+ * Implements the uri callback.
+ */
+function itonics_training_uri($product) {
+    return array(
+      'path' => INDEX . $product->id,
+    );
+}
+
+/**
+ * Returns a render array with all products entities.
+ */
+function itonics_training_list() {
+    $content = array();
+    // Load all of our entities.
+    $result = entity_get_controller('itonics_training')->load_products();
+    
+    $table_header = array(
+        array('data' => t('S.No.'), 'field' => 'id'),
+        array('data' => t('Title'), 'field' => 'title', 'sort' => 'desc'),
+        array('data' => t('Price')),
+        array('data' => t('Additional Image')),
+        array('data' => t('Type'), 'field' => 'type'),
+        array('data' => t('Owner Email'), 'field' => 'owner_email'),
+        array('data' => t('Summary'), 'field' => 'summary'),
+        array('data' => t('description'), 'field' => 'description'),
+        array('data' => t('Image'), 'field' => 'image'),
+        array('data' => t('Action')),
+    );
+
+    $rows = array();
+    $i = 0;
+    foreach ($result as $res) {
+        $view = user_access('access itonics_training view') ? "<a href='" . INDEX . "/" . $res->id . "'>View</a>" : "";
+        $edit = user_access('access itonics_training edit') ? " / <a href='" . INDEX . "/" . $res->id . "/edit'>Edit</a>" : "";
+        $delete = user_access('access itonics_training edit') ? " / <a href='" . INDEX . "/" . $res->id . "/delete'>Delete</a>" : "";
+        $additional_image_data = field_get_items('itonics_training', $res, 'additional_image');
+        $price = field_get_items('itonics_training', $res, 'price');
+    
+        $rows[] = array(
+            ++$i,
+            $res->title,
+            $price[0]['value'],
+            $additional_image_data[0]['uri'] ? '<img src="' . file_create_url($additional_image_data[0]['uri']) . '" width="50" height="50" />' : NULL,
+            $res->type,
+            $res->owner_email,
+            $res->summary,
+            $res->description,
+            $res->image ? '<img src="' . file_create_url($res->image) . '" width="50" height="50" />' : NULL,
+            $view.$edit.$delete,
+        );
+    }
+
+    $output = user_access('access itonics_training create') ? '<a href="' . CREATE . '" style="float:right;">Add Product</a><br/>' : "";
+
+    if (!empty($rows)) {
+        $output .= theme('table', array('header' => $table_header, 'rows' => $rows, 'attributes' => array('title' => 'sort-table')));
+        $output .= theme('pager');
+    } else {
+        $output .= t("No products.");
+    }
+
+    return $output;
+}
+
+/***
+ * Loads product object for view / edit page
+ */
+function itonics_training_load($product_id) {
+    $result = entity_get_controller('itonics_training')->load_products(array($product_id), array('id' => $product_id));
+    return isset($result[$product_id]) ? $result[$product_id] : NULL;
+}
+
+/**
+ * Create / Edit Form
+ */
+function itonics_training_create_update_view($product = NULL) {
+    if(!$product) $product = entity_get_controller('itonics_training')->create();
+    $categories = entity_get_controller('itonics_training')->load_categories($product->id, array('category_id'));
+    
+    return drupal_get_form('itonics_training_form', $product, $categories);
+}
+
+/**
+ * View Details
+ */
+function itonics_training_view($product)
+{   
+    $additional_image_data = field_get_items('itonics_training', $product, 'additional_image');
+    $price = field_get_items('itonics_training', $product, 'price');
+    
+    $current_categories_results = entity_get_controller('itonics_training')->load_categories($product->id, array('category_id'));
+    $query_categories = db_select('categories', 'c')->fields('c', array('title'))
+        ->condition('id', $current_categories_results, 'IN')->execute()->fetchAllAssoc('title');
+    $categories = implode(', ', array_keys($query_categories));
+    
+    $output = $product->image ? '<label>Current Image</label><img src="' . file_create_url($product->image) . '" width="200" height="200" />' : null;
+
+    $output .= isset($additional_image_data[0]['uri']) ? '<label>Additional Image</label><img src="' . file_create_url($product->additional_image['und'][0]['uri']) . '" width="200" height="200" />' : null;
+
+    $table_header = array();
+    $rows[] = array(
+        "Title",
+        $product->title,
+    );
+    $rows[] = array(
+        "Price",
+        isset($price[0]['value']) ? $price[0]['value'] : 0,
+    );
+    $rows[] = array(
+        "Type",
+        $product->type,
+    );
+    $rows[] = array(
+        "Owner Email",
+        $product->owner_email,
+    );
+    $rows[] = array(
+        "Categories",
+        $categories,
+    );
+    $rows[] = array(
+        "Summary",
+        $product->summary,
+    );
+    $rows[] = array(
+        "Description",
+        $product->description,
+    );
+
+    if (!empty($rows)) {
+        $output .= theme('table', array('header' => $table_header, 'rows' => $rows, 'attributes' => array('title' => 'sort-table')));
+    } else {
+        $output = t("Product Not found.");
+    }
+    return $output;
+}
+
+/** Delete */
+function itonics_training_delete_confirm($form, &$form_state, $product)
+{
+    $form['_product'] = array(
+        '#type' => 'value',
+        '#value' => $product,
+    );
+    return confirm_form($form, 
+                        t(Delete_Confirm),
+                        isset($_GET['destination']) ? $_GET['destination'] : "product", 
+                        null, 
+                        t('Delete'), t('Cancel')
+                      );
+}
+
+function itonics_training_delete_confirm_submit($form, &$form_state)
+{
+    $form_values = $form_state['values'];
+    if ($form_state['values']['confirm']) {
+        $product = $form_state['values']['_product'];
+        entity_get_controller('itonics_training')->delete($product);       
+    }
+
+    drupal_set_message(t(Product_Deleted_Msg));
+    $form_state['redirect'] = INDEX;
+}

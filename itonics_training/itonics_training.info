@@ -1,0 +1,5 @@
+name = "Training Day 2"
+description = "Entity CRUD."
+core = 7.x
+package = "Itonics Training"
+author = "Prabesh"

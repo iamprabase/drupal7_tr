@@ -2,7 +2,7 @@
 
 /** Implements hooks schema */
 
-function tr1_ajax_crud_schema() {
+function itonics_training_schema() {
     $schema = array();
 
     $schema['products'] = array(
@@ -114,3 +114,93 @@ function tr1_ajax_crud_schema() {
     return $schema;
 }
 
+/*
+ * Implements hook_install
+ */
+function itonics_training_install() {
+    /**
+     * Install Fields
+     */
+    // Image Field for storing the image of a Pestle Segment created by using FIELD UI.
+
+    $field_name = 'additional_image';
+    $field = field_info_field($field_name);
+    if (empty($field)) {
+        $field = array(
+            'field_name' => $field_name,
+            'type' => 'file'
+        );
+        field_create_field($field);
+
+
+        //  Create the instance on the bundle.
+        $instance = array(
+            'field_name' => $field_name, 
+            'entity_type' => 'itonics_training', 
+            'label' => t('Additional Image'), 
+            'bundle' => 'itonics_training', 
+            // If you don't set the "required" property then the field wont be required by default.
+            'required' => FALSE,
+            'settings' => array(
+            // Here you inform either or not you want this field showing up on the registration form.
+                'user_register_form' => 1,
+                'file_extensions' => 'jpg, gif, png',
+                'file_directory' => 'itonics_training/additional_images',
+                'max_filesize' => '',
+            ),
+            'widget' => array(
+                'type' => 'textfield',
+            ), 
+        );
+        field_create_instance($instance);
+    }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function itonics_training_uninstall() {
+    // Delete itonics_training_image field attached from Field UI
+    field_delete_field('additional_image');
+}
+
+/**
+ * Adding field to define product price
+ */
+function itonics_training_update_7002() {
+
+    $field_name = 'price';
+    $field = field_info_field($field_name);
+    if (empty($field)) {
+        $field = array(
+            'field_name' => $field_name,
+            'type' => 'text', 
+        );
+        field_create_field($field);
+
+        //  Create the instance on the bundle.
+        $instance = array(
+            'field_name' => $field_name, 
+            'entity_type' => 'itonics_training', 
+            'label' => t('Product Price'), 
+            'bundle' => 'itonics_training', 
+            // If you don't set the "required" property then the field wont be required by default.
+            'required' => FALSE,
+            'settings' => array(
+                'precision' => 10,
+                'scale' => 2,
+                'decimal_separator' => '.',
+            ),
+            'instance_settings' => array(
+                'min' => '',
+                'max' => '',
+                'prefix' => '',
+                'suffix' => '',
+            ),
+            'default_widget' => 'number',
+            'default_formatter' => 'number_decimal',
+        );
+        field_create_instance($instance);
+
+    }
+}
