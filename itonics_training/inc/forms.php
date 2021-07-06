@@ -4,23 +4,28 @@
  * for create edit operation 
 */
 function itonics_training_form($form, &$form_state, $instance, $current_categories = array()) {
-    drupal_add_css(drupal_get_path('module', 'itonics_training') . '/assets/css/custom.css');
-    // for ajax redirections
-    drupal_add_js(drupal_get_path('module', 'itonics_training') . '/assets/js/custom.js');
-
+    
     $fetch_categories = db_select('categories', 'n')->fields('n')
                         ->execute()->fetchAll();
     $categories = array();
     foreach ($fetch_categories as $category) {
         $categories[$category->id] = t($category->title);
     }
-    
+
     $form['title'] = array(
         '#type' => 'textfield',
         '#title' => t('Product Name'),
         '#id' => 'input_title',
         '#suffix' => '<div class="validation-error-msg" id="input-title-error-msg"></div>',
         '#default_value' => $instance->title,
+    );
+    
+    $form['expiry_date'] = array(
+        '#title' => t('Expiry Date'),
+        '#type' => 'date_popup',
+        '#date_format' => 'Y-m-d',
+        '#suffix' => '<div class="validation-error-msg" id="input-expiry_date-error-msg"></div>',
+        '#default_value' => $instance->expiry_date,
     );
     
     $form['category'] = array(
@@ -75,7 +80,7 @@ function itonics_training_form($form, &$form_state, $instance, $current_categori
 
     $form['image'] = array(
         '#title' => t('Choose an image'),
-        '#type' => 'file',
+        '#type' => 'file',//managed_file //file usage addd
         '#description' => t('File must be of given types: png gif jpg jpeg'),
         '#id' => '#input_image',
         '#suffix' => '<span class="validation-error-msg" id="input-image-error-msg"></span>',
@@ -91,10 +96,6 @@ function itonics_training_form($form, &$form_state, $instance, $current_categori
     }
     
     field_attach_form('itonics_training', $instance, $form, $form_state);
-    $form['price']['#weight'] = 8;
-    $form['price']['#suffix'] = '<div class="validation-error-msg" id="input-price-error-msg"></div>';
-    $form['price']['#id'] = 'price';
-    $form['additional_image']['#weight'] = 9;
     
     // Provide a submit button.
     $form['submit'] = array(
@@ -111,12 +112,32 @@ function itonics_training_form($form, &$form_state, $instance, $current_categori
     return $form;
 }
 
+/**
+*file_usage
+*hook_entity_insert
+*hook_entity_update
+*hook_entity_delete
+*hook_entity_presave 
+*/
+
+function itonics_training_form_alter(&$form, &$form_state, $form_id) {    
+    if($form_id == 'itonics_training_form') {
+        $form['price']['#weight'] = 8;
+        $form['price']['#suffix'] = '<div class="validation-error-msg" id="input-price-error-msg"></div>';
+        $form['price']['#id'] = 'price';
+        $form['additional_image']['#weight'] = 9;
+        
+        return $form;
+    }
+}
+
 function itonics_training_form_validate($form, &$form_state) {
     $form_elements = $form_state['values'];
     $title = $form_elements['title'];
     $owner_email = $form_elements['owner_email'];
     $type = $form_elements['type'];
     $summary = $form_elements['summary'];
+    $expiry_date = $form_elements['expiry_date'];
     $price = $form_elements['price']['und'][0]['value'];
     $form_errors = array();
 
@@ -147,6 +168,10 @@ function itonics_training_form_validate($form, &$form_state) {
     }
     if($price && !preg_match('#\d+(?:\.\d{1,2})?#', $price)) {
         $form_errors['price'] = t('Invalid format.');
+    }
+
+    if($expiry_date && !preg_match("/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$/", $expiry_date)) {
+        $form_errors['expiry_date'] = t('Invalid date format.');
     }
     
     $ajax_response = array();   
@@ -185,7 +210,7 @@ function itonics_training_form_validate($form, &$form_state) {
         );
 
         try {
-            $file = file_save_upload('image', $validators, 'public://', $replace = time());
+            $file = file_save_upload('image', $validators, 'public://', $replace = 0);
         } catch (Exception $e) {
             watchdog_exception('my_type', $e);
             $ajax_response = array();

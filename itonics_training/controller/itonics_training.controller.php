@@ -11,6 +11,7 @@ class ItonicsTrainingController extends DrupalDefaultEntityController {
         $entity->title = '';
         $entity->type = 'Active';
         $entity->owner_email = '';
+        $entity->expiry_date = '';
         $entity->summary = '';
         $entity->description = '';
         $entity->image = NULL;
@@ -40,7 +41,7 @@ class ItonicsTrainingController extends DrupalDefaultEntityController {
         
         return $entity;
     }
-
+    
     private function attach($category_ids, $id){
         $category_product_insert_query = db_insert('category_product')
                                         ->fields(array('category_id', 'product_id'));
@@ -82,6 +83,7 @@ class ItonicsTrainingController extends DrupalDefaultEntityController {
     */
     public function deleteMultiple($entities) {
         foreach($entities as $entity) {
+            $transaction = db_transaction();
             if ($entity->image) {
                 if (file_exists($entity->image)) {
                     drupal_unlink($entity->image);
@@ -89,24 +91,17 @@ class ItonicsTrainingController extends DrupalDefaultEntityController {
 
                 module_invoke_all('entity_delete', $entity, 'itonics_training');
                 field_attach_delete('itonics_training', $entity);
-                // $basic_ids[] = $entity->id;
-
             }
     
-            $transaction = db_transaction();
             try {
-
                 db_delete('products')->condition('id',  $entity->id)->execute();
                 $this->dettach($entity->id);
-    
             } catch (Exception $e) {
                 $transaction->rollback();
                 watchdog_exception('my_type', $e);
                 drupal_set_message(t(Error_Msg), 'error');
             }
-
         }
- 
     }
 
     /**

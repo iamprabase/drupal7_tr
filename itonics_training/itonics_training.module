@@ -41,18 +41,21 @@ function itonics_training_menu() {
         'title' => t('Products List'),
         'page callback' => 'itonics_training_list',
         'access arguments' => array(INDEX_PERM),
+        'access callback' => 'itonics_training_access',
         'type' => MENU_NORMAL_ITEM,
     );
     $permissions[SHOW] = array(
         'title' => t('Product Details'),
         'page callback' => 'itonics_training_view',
         'page arguments' => array(1),
+        'access callback' => 'itonics_training_access',
         'access arguments' => array(SHOW_PERM),
     );
     $permissions[CREATE] = array(
         'title' => t('Create Product'),
         'page callback' => 'itonics_training_create_update_view',
         'page arguments' => array(),
+        'access callback' => 'itonics_training_access',
         'access arguments' => array(CREATE_PERM),
         'type' => MENU_LOCAL_TASK,
     );
@@ -60,17 +63,42 @@ function itonics_training_menu() {
         'title' => t('Edit Product'),
         'page callback' => 'itonics_training_create_update_view',
         'page arguments' => array(1),
+        'access callback' => 'itonics_training_access',
         'access arguments' => array(EDIT_PERM),
         'type' => MENU_LOCAL_TASK,
     );
     $permissions[DELETE] = array(
         'title' => t('Delete Product'),
         'page callback' => 'drupal_get_form',
+        'access callback' => 'itonics_training_access',
         'page arguments' => array('itonics_training_delete_confirm', 1),
+        'access arguments' => array(DELETE_PERM),
+    );
+    $permissions[DELETE_POPUP_MODAL_SHOW] = array(
+        'title' => t('Get Delete Product Popup Modal'),
+        'page callback' => 'itonics_training_delete_popup',
+        'access callback' => 'itonics_training_access',
+        'page arguments' => array(1),
         'access arguments' => array(DELETE_PERM),
     );
     
     return $permissions;
+}
+
+function itonics_training_access($op, $account = null) {
+    global $user;
+    if(!$account) $account = $user;
+
+    if(!in_array($op, array(INDEX_PERM, SHOW_PERM, CREATE_PERM, EDIT_PERM, DELETE_PERM)) ) return false;
+    if($account->uid == 1) return true;
+    
+    if(user_access(INDEX_PERM) && $op == INDEX_PERM) return true;
+    if(user_access(SHOW_PERM) && $op == SHOW_PERM) return true;
+    if(user_access(CREATE_PERM) && $op == CREATE_PERM) return true;
+    if(user_access(EDIT_PERM) && $op == EDIT_PERM) return true;
+    if(user_access(DELETE_PERM) && $op == DELETE_PERM) return true;
+
+    return false;
 }
 
 /** 
@@ -106,6 +134,10 @@ function itonics_training_uri($product) {
  * Returns a render array with all products entities.
  */
 function itonics_training_list() {
+    ctools_include('modal');
+    ctools_include('ajax');
+    ctools_modal_add_js();
+    
     $content = array();
     // Load all of our entities.
     $result = entity_get_controller('itonics_training')->load_products();
@@ -125,25 +157,36 @@ function itonics_training_list() {
 
     $rows = array();
     $i = 0;
+    $user_show_access = itonics_training_access(SHOW_PERM);
+    $user_edit_access = itonics_training_access(EDIT_PERM);
+    $user_delete_access = itonics_training_access(DELETE_PERM);
+
     foreach ($result as $res) {
-        $view = user_access('access itonics_training view') ? "<a href='" . INDEX . "/" . $res->id . "'>View</a>" : "";
-        $edit = user_access('access itonics_training edit') ? " / <a href='" . INDEX . "/" . $res->id . "/edit'>Edit</a>" : "";
-        $delete = user_access('access itonics_training edit') ? " / <a href='" . INDEX . "/" . $res->id . "/delete'>Delete</a>" : "";
+        $view = $user_show_access ? "<a href='" . INDEX . "/" . $res->id . "'>View</a>" : "";
+        $edit = $user_edit_access ? " / <a href='" . INDEX . "/" . $res->id . "/edit'>Edit</a>" : "";
+        $delete = $user_delete_access ? " / <a href='" . INDEX . "/" . $res->id . "/delete'>Delete</a>" : "";
         $additional_image_data = field_get_items('itonics_training', $res, 'additional_image');
         $price = field_get_items('itonics_training', $res, 'price');
-    
+
+        $delete_popup_el = t('Delete Popup');
+        $dest = INDEX . "/" . $res->id . "/delete_popup_modal_show";
+        $popup_Link =  $user_delete_access ? " / ".ctools_modal_text_button($delete_popup_el, $dest, $delete_popup_el) : "";
+
         $rows[] = array(
-            ++$i,
-            $res->title,
-            $price[0]['value'],
-            $additional_image_data[0]['uri'] ? '<img src="' . file_create_url($additional_image_data[0]['uri']) . '" width="50" height="50" />' : NULL,
-            $res->type,
-            $res->owner_email,
-            $res->summary,
-            $res->description,
-            $res->image ? '<img src="' . file_create_url($res->image) . '" width="50" height="50" />' : NULL,
-            $view.$edit.$delete,
-        );
+                    'class' => array('tb-row-' . $res->id),
+                    'data' => array(
+                        ++$i,
+                        $res->title,
+                        $price[0]['value'],
+                        $additional_image_data[0]['uri'] ? '<img src="' . file_create_url($additional_image_data[0]['uri']) . '" width="50" height="50" />' : NULL,
+                        $res->type,
+                        $res->owner_email,
+                        check_plain($res->summary),
+                        $res->description,
+                        $res->image ? '<img src="' . file_create_url($res->image) . '" width="50" height="50" />' : NULL,
+                        $view.$edit.$delete == "" ? "No Action Access" : $view.$edit.$delete.$popup_Link,
+                    )
+                );
     }
 
     $output = user_access('access itonics_training create') ? '<a href="' . CREATE . '" style="float:right;">Add Product</a><br/>' : "";
@@ -170,17 +213,26 @@ function itonics_training_load($product_id) {
  * Create / Edit Form
  */
 function itonics_training_create_update_view($product = NULL) {
+    drupal_add_css(drupal_get_path('module', 'itonics_training') . '/assets/css/custom.css');
+    // for ajax redirections
+    drupal_add_js(drupal_get_path('module', 'itonics_training') . '/assets/js/custom.js');
+    // drupal_add_js(drupal_get_path('module', 'itonics_training') . '/assets/js/jquery.min.js');
+    
+    // drupal_add_css(drupal_get_path('module', 'itonics_training') . '/assets/css/jquery.multiselect.css');
+    // drupal_add_js(drupal_get_path('module', 'itonics_training') . '/assets/js/jquery.multiselect.js');
+
     if(!$product) $product = entity_get_controller('itonics_training')->create();
     $categories = entity_get_controller('itonics_training')->load_categories($product->id, array('category_id'));
+    $form = drupal_get_form('itonics_training_form', $product, $categories);
+    if(isset($form['expiry_date']['date']['#title']))$form['expiry_date']['date']['#title'] = NULL;
     
-    return drupal_get_form('itonics_training_form', $product, $categories);
+    return $form;
 }
 
 /**
  * View Details
  */
-function itonics_training_view($product)
-{   
+function itonics_training_view($product) {   
     $additional_image_data = field_get_items('itonics_training', $product, 'additional_image');
     $price = field_get_items('itonics_training', $product, 'price');
     
@@ -196,7 +248,11 @@ function itonics_training_view($product)
     $table_header = array();
     $rows[] = array(
         "Title",
-        $product->title,
+        check_plain($product->title),
+    );
+    $rows[] = array(
+        "Expiry Date",
+        $product->expiry_date,
     );
     $rows[] = array(
         "Price",
@@ -208,7 +264,7 @@ function itonics_training_view($product)
     );
     $rows[] = array(
         "Owner Email",
-        $product->owner_email,
+        check_plain($product->owner_email),
     );
     $rows[] = array(
         "Categories",
@@ -216,11 +272,11 @@ function itonics_training_view($product)
     );
     $rows[] = array(
         "Summary",
-        $product->summary,
+        check_plain($product->summary),
     );
     $rows[] = array(
         "Description",
-        $product->description,
+        check_plain($product->description),
     );
 
     if (!empty($rows)) {
@@ -231,23 +287,22 @@ function itonics_training_view($product)
     return $output;
 }
 
-/** Delete */
-function itonics_training_delete_confirm($form, &$form_state, $product)
-{
+/** Normal Delete */
+function itonics_training_delete_confirm($form, &$form_state, $product) {
+    if(!$product) return NULL;
     $form['_product'] = array(
         '#type' => 'value',
         '#value' => $product,
     );
     return confirm_form($form, 
                         t(Delete_Confirm),
-                        isset($_GET['destination']) ? $_GET['destination'] : "product", 
+                        isset($_GET['destination']) ? $_GET['destination'] : "products", 
                         null, 
                         t('Delete'), t('Cancel')
                       );
 }
 
-function itonics_training_delete_confirm_submit($form, &$form_state)
-{
+function itonics_training_delete_confirm_submit($form, &$form_state) {
     $form_values = $form_state['values'];
     if ($form_state['values']['confirm']) {
         $product = $form_state['values']['_product'];
@@ -256,4 +311,60 @@ function itonics_training_delete_confirm_submit($form, &$form_state)
 
     drupal_set_message(t(Product_Deleted_Msg));
     $form_state['redirect'] = INDEX;
+}
+
+/** Delete Using callback */
+function itonics_training_delete_popup($product) {
+    // for ajax redirections
+    drupal_add_js(drupal_get_path('module', 'itonics_training') . '/assets/js/custom.js');
+    ctools_include('modal');
+    ctools_include('ajax');
+    
+    if($product) {
+        $form = drupal_render(drupal_get_form('itonics_training_delete_popup_confirm', $product));
+        $commands = ctools_modal_form_render(array(), $form);
+        
+    } else {
+        $commands[] = ctools_modal_command_dismiss();
+        $commands[] = ajax_command_alert(t('Product doesnot exists.'));
+        //ajax_command_invoke(NULL, 'redirect', array(INDEX));
+    }
+    print ajax_render($commands);
+    exit;
+}
+
+function itonics_training_delete_popup_confirm($form, &$form_state, $product) {
+    $form['_product'] = array(
+        '#type' => 'value',
+        '#value' => $product,
+    );
+    
+    $confirmation_form = confirm_form($form, 
+                            t(Delete_Confirm),
+                            isset($_GET['destination']) ? $_GET['destination'] : "products", 
+                            null, 
+                            t('Delete'), t('Cancel')
+                        );
+
+    return $confirmation_form;
+}
+
+function itonics_training_delete_popup_confirm_submit($form, &$form_state) {
+     
+    $form_values = $form_state['values'];
+    $id = null;
+    if ($form_state['values']['confirm']) {
+        $product = $form_state['values']['_product'];
+        $id = $product->id;
+        entity_get_controller('itonics_training')->delete($product);       
+    }
+
+    // drupal_set_message(t(Product_Deleted_Msg));
+    // $commands[] = ajax_command_invoke(NULL, 'redirect', array(INDEX));
+    $commands[] = ajax_command_alert(t(Product_Deleted_Msg));
+    $commands[] = ctools_modal_command_dismiss();
+    $commands[] = ajax_command_invoke('.tb-row-'.$id, 'remove');
+    $commands[] = ajax_command_invoke('#messages', 'remove');
+    print ajax_render($commands);
+    exit;
 }

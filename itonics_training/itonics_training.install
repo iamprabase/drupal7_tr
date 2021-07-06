@@ -20,6 +20,12 @@ function itonics_training_schema() {
                 'length' => 191,
                 'not null' => TRUE,
             ),
+            'expiry_date' => array(
+                'description' => 'The Expiry Date for the product.',
+                'type' => 'varchar',
+                'length' => 10,
+                'not null' => TRUE,
+            ),
             'type' => array(
                 'description' => 'The status of the product \'Active\' \'Inactive\' .',
                 'type' => 'varchar',
@@ -120,8 +126,7 @@ function itonics_training_schema() {
 function itonics_training_install() {
     /**
      * Install Fields
-     */
-    // Image Field for storing the image of a Pestle Segment created by using FIELD UI.
+    */
 
     $field_name = 'additional_image';
     $field = field_info_field($field_name);
@@ -153,6 +158,41 @@ function itonics_training_install() {
             ), 
         );
         field_create_instance($instance);
+    }
+
+    $field_name = 'price';
+    $field = field_info_field($field_name);
+    if (empty($field)) {
+        $field = array(
+            'field_name' => $field_name,
+            'type' => 'text', 
+        );
+        field_create_field($field);
+
+        //  Create the instance on the bundle.
+        $instance = array(
+            'field_name' => $field_name, 
+            'entity_type' => 'itonics_training', 
+            'label' => t('Product Price'), 
+            'bundle' => 'itonics_training', 
+            // If you don't set the "required" property then the field wont be required by default.
+            'required' => FALSE,
+            'settings' => array(
+                'precision' => 10,
+                'scale' => 2,
+                'decimal_separator' => '.',
+            ),
+            'instance_settings' => array(
+                'min' => '',
+                'max' => '',
+                'prefix' => '',
+                'suffix' => '',
+            ),
+            'default_widget' => 'number',
+            'default_formatter' => 'number_decimal',
+        );
+        field_create_instance($instance);
+
     }
 }
 
@@ -202,5 +242,21 @@ function itonics_training_update_7002() {
         );
         field_create_instance($instance);
 
+    }
+}
+
+/**
+ * Adding field to define product price
+ */
+function itonics_training_update_7003() {
+
+    if (!db_field_exists('products', 'expiry_date')) {
+        $spec = array(
+            'description' => 'The Expiry Date for the product.',
+            'type' => 'varchar',
+            'length' => 10,
+        );
+
+        db_add_field('products', 'expiry_date', $spec);
     }
 }

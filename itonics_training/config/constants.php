@@ -6,6 +6,7 @@ const CREATE = 'products/create';
 const SHOW = 'products/%itonics_training';
 const EDIT = 'products/%itonics_training/edit';
 const DELETE = 'products/%itonics_training/delete';
+const DELETE_POPUP_MODAL_SHOW = 'products/%itonics_training/delete_popup_modal_show';
 /** Messages */
 const Error_Msg = 'Some Error Occured. Please try again.';
 const Product_Created_Msg = 'Product created successfully.';

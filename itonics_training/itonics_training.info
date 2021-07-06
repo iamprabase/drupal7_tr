@@ -1,5 +1,5 @@
-name = "Training Day 2"
-description = "Entity and Field API CRUD."
+name = "Training Day 3"
+description = "Ctools API Roles Permission and form alter."
 core = 7.x
 package = "Itonics Training"
 author = "Prabesh"
