@@ -1,5 +1,5 @@
 name = "Training Day 2"
-description = "Entity CRUD."
+description = "Entity and Field API CRUD."
 core = 7.x
 package = "Itonics Training"
 author = "Prabesh"
